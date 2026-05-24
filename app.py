@@ -8,14 +8,13 @@ from flask_login import (
     login_required,
     current_user
 )
+
 from werkzeug.security import (
     generate_password_hash,
     check_password_hash
 )
 
 from reportlab.pdfgen import canvas
-
-import os
 
 # =========================
 # APP CONFIG
@@ -24,8 +23,6 @@ import os
 app = Flask(__name__)
 
 app.secret_key = 'secret123'
-
-
 
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///ideas.db'
 
@@ -211,9 +208,23 @@ def analyze():
 
     description = request.form['description']
 
-    # SIMPLE AI LOGIC
+    text = description.lower()
 
-    if 'ai' in description.lower():
+    # =========================
+    # SMART AI CATEGORY DETECTION
+    # =========================
+
+    # AI CATEGORY
+
+    if (
+
+        'ai' in text or
+        'machine learning' in text or
+        'deep learning' in text or
+        'chatbot' in text or
+        'neural network' in text
+
+    ):
 
         category = 'Artificial Intelligence'
 
@@ -221,7 +232,16 @@ def analyze():
 
         originality = 85
 
-    elif 'blockchain' in description.lower():
+    # BLOCKCHAIN CATEGORY
+
+    elif (
+
+        'blockchain' in text or
+        'crypto' in text or
+        'bitcoin' in text or
+        'ethereum' in text
+
+    ):
 
         category = 'Blockchain'
 
@@ -229,13 +249,44 @@ def analyze():
 
         originality = 80
 
-    elif 'iot' in description.lower():
+    # IOT CATEGORY
+
+    elif (
+
+        'iot' in text or
+        'sensor' in text or
+        'smart irrigation' in text or
+        'automation' in text or
+        'arduino' in text or
+        'raspberry pi' in text or
+        'smart home' in text
+
+    ):
 
         category = 'IoT'
 
         similarity = 25
 
         originality = 75
+
+    # CYBER SECURITY CATEGORY
+
+    elif (
+
+        'cybersecurity' in text or
+        'security' in text or
+        'hacking' in text or
+        'encryption' in text
+
+    ):
+
+        category = 'Cyber Security'
+
+        similarity = 30
+
+        originality = 70
+
+    # DEFAULT CATEGORY
 
     else:
 
@@ -245,7 +296,9 @@ def analyze():
 
         originality = 65
 
+    # =========================
     # SAVE PROJECT
+    # =========================
 
     new_project = Project(
 
@@ -264,7 +317,9 @@ def analyze():
 
     db.session.commit()
 
+    # =========================
     # AI SUGGESTIONS
+    # =========================
 
     suggestions = [
 

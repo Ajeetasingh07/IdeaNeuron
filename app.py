@@ -25,9 +25,9 @@ app = Flask(__name__)
 
 app.secret_key = 'secret123'
 
-os.makedirs('instance', exist_ok=True)
 
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///instance/ideas.db'
+
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///ideas.db'
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 

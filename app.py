@@ -8,41 +8,40 @@ from flask_login import (
     login_required,
     current_user
 )
-
 from werkzeug.security import (
     generate_password_hash,
     check_password_hash
 )
 
-from reportlab.platypus import (
-    SimpleDocTemplate,
-    Paragraph,
-    Spacer
-)
+from reportlab.pdfgen import canvas
 
-from reportlab.lib.styles import getSampleStyleSheet
+import os
 
-import random
+# =========================
+# APP CONFIG
+# =========================
 
 app = Flask(__name__)
 
-app.config['SECRET_KEY'] = 'ideaneuronsecret'
+app.secret_key = 'secret123'
 
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///ideas.db'
+os.makedirs('instance', exist_ok=True)
+
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///instance/ideas.db'
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
+
+# =========================
+# LOGIN MANAGER
+# =========================
 
 login_manager = LoginManager()
 
 login_manager.init_app(app)
 
 login_manager.login_view = 'login'
-
-# STORE LATEST REPORT
-
-latest_report = {}
 
 # =========================
 # DATABASE MODELS
@@ -57,11 +56,13 @@ class User(UserMixin, db.Model):
 
     username = db.Column(
         db.String(100),
-        unique=True
+        unique=True,
+        nullable=False
     )
 
     password = db.Column(
-        db.String(200)
+        db.String(200),
+        nullable=False
     )
 
 
@@ -85,15 +86,23 @@ class Project(db.Model):
     )
 
     similarity = db.Column(
-        db.Float
+        db.Integer
     )
 
     originality = db.Column(
-        db.Float
+        db.Integer
     )
 
 # =========================
-# LOGIN MANAGER
+# CREATE DATABASE
+# =========================
+
+with app.app_context():
+
+    db.create_all()
+
+# =========================
+# USER LOADER
 # =========================
 
 @login_manager.user_loader
@@ -115,7 +124,6 @@ def home():
 # =========================
 
 @app.route('/signup', methods=['GET', 'POST'])
-
 def signup():
 
     if request.method == 'POST':
@@ -125,6 +133,14 @@ def signup():
         password = request.form['password']
 
         hashed_password = generate_password_hash(password)
+
+        existing_user = User.query.filter_by(
+            username=username
+        ).first()
+
+        if existing_user:
+
+            return "Username already exists"
 
         new_user = User(
 
@@ -137,7 +153,7 @@ def signup():
 
         db.session.commit()
 
-        return redirect('/login')
+        return redirect(url_for('login'))
 
     return render_template('signup.html')
 
@@ -146,7 +162,6 @@ def signup():
 # =========================
 
 @app.route('/login', methods=['GET', 'POST'])
-
 def login():
 
     if request.method == 'POST':
@@ -166,7 +181,9 @@ def login():
 
             login_user(user)
 
-            return redirect('/projects')
+            return redirect(url_for('projects'))
+
+        return "Invalid Username or Password"
 
     return render_template('login.html')
 
@@ -175,138 +192,58 @@ def login():
 # =========================
 
 @app.route('/logout')
-
 @login_required
 def logout():
 
     logout_user()
 
-    return redirect('/')
+    return redirect(url_for('home'))
 
 # =========================
 # ANALYZE PROJECT
 # =========================
 
 @app.route('/analyze', methods=['POST'])
-
 @login_required
 def analyze():
-
-    global latest_report
 
     title = request.form['title']
 
     description = request.form['description']
 
-    desc = description.lower()
+    # SIMPLE AI LOGIC
 
-    # CATEGORY DETECTION
-
-    if 'ai' in desc or 'machine learning' in desc:
+    if 'ai' in description.lower():
 
         category = 'Artificial Intelligence'
 
-    elif 'blockchain' in desc:
+        similarity = 15
+
+        originality = 85
+
+    elif 'blockchain' in description.lower():
 
         category = 'Blockchain'
 
-    elif 'iot' in desc:
+        similarity = 20
+
+        originality = 80
+
+    elif 'iot' in description.lower():
 
         category = 'IoT'
 
-    elif 'web' in desc:
+        similarity = 25
 
-        category = 'Web Development'
+        originality = 75
 
     else:
 
-        category = 'Software Project'
+        category = 'Web Development'
 
-    # SIMILARITY ANALYSIS
+        similarity = 35
 
-    common_projects = [
-
-        'AI Chatbot for students',
-
-        'Weather App',
-
-        'Blockchain Voting System',
-
-        'IoT Smart Home',
-
-        'Student Management System'
-    ]
-
-    most_similar = random.choice(common_projects)
-
-    similarity_score = round(
-        random.uniform(10, 80),
-        2
-    )
-
-    originality_score = round(
-        100 - similarity_score,
-        2
-    )
-
-    # AI SUGGESTIONS
-
-    suggestions = []
-
-    if "chatbot" in desc:
-
-        suggestions.append(
-            "Add voice assistant integration"
-        )
-
-        suggestions.append(
-            "Use NLP for smarter conversations"
-        )
-
-    if "ai" in desc:
-
-        suggestions.append(
-            "Add Machine Learning prediction system"
-        )
-
-    if "blockchain" in desc:
-
-        suggestions.append(
-            "Integrate smart contracts"
-        )
-
-    if "iot" in desc:
-
-        suggestions.append(
-            "Add real-time sensor analytics"
-        )
-
-    if "health" in desc:
-
-        suggestions.append(
-            "Add disease prediction AI"
-        )
-
-    if "student" in desc:
-
-        suggestions.append(
-            "Add personalized recommendation engine"
-        )
-
-    # DEFAULT SUGGESTIONS
-
-    if len(suggestions) == 0:
-
-        suggestions = [
-
-            "Add AI-powered analytics",
-
-            "Improve UI/UX experience",
-
-            "Add real-time dashboard",
-
-            "Use cloud deployment"
-        ]
+        originality = 65
 
     # SAVE PROJECT
 
@@ -318,43 +255,39 @@ def analyze():
 
         category=category,
 
-        similarity=similarity_score,
+        similarity=similarity,
 
-        originality=originality_score
+        originality=originality
     )
 
     db.session.add(new_project)
 
     db.session.commit()
 
-    # SAVE REPORT DATA
+    # AI SUGGESTIONS
 
-    latest_report = {
+    suggestions = [
 
-        "category": category,
+        "Add machine learning features",
 
-        "similarity_score": similarity_score,
+        "Improve user experience",
 
-        "originality_score": originality_score,
+        "Use cloud integration",
 
-        "most_similar": most_similar,
-
-        "suggestions": suggestions
-    }
-
-    # RESULT PAGE
+        "Add real-time analytics"
+    ]
 
     return render_template(
 
         'result.html',
 
+        title=title,
+
         category=category,
 
-        similarity_score=similarity_score,
+        similarity=similarity,
 
-        originality_score=originality_score,
-
-        most_similar=most_similar,
+        originality=originality,
 
         suggestions=suggestions
     )
@@ -364,7 +297,6 @@ def analyze():
 # =========================
 
 @app.route('/projects')
-
 @login_required
 def projects():
 
@@ -390,13 +322,11 @@ def projects():
 
     if total_projects > 0:
 
-        avg_originality = round(
+        avg_originality = int(
 
             sum(
                 p.originality for p in projects
-            ) / total_projects,
-
-            2
+            ) / total_projects
         )
 
     else:
@@ -423,124 +353,72 @@ def projects():
     )
 
 # =========================
-# DOWNLOAD REPORT
+# DELETE PROJECT
 # =========================
 
-@app.route('/download-report')
-
+@app.route('/delete/<int:id>')
 @login_required
-def download_report():
+def delete_project(id):
 
-    global latest_report
+    project = Project.query.get_or_404(id)
 
-    doc = SimpleDocTemplate(
-        "AI_Project_Report.pdf"
+    db.session.delete(project)
+
+    db.session.commit()
+
+    return redirect(url_for('projects'))
+
+# =========================
+# DOWNLOAD PDF
+# =========================
+
+@app.route('/download_pdf')
+@login_required
+def download_pdf():
+
+    file_name = 'AI_Project_Report.pdf'
+
+    c = canvas.Canvas(file_name)
+
+    c.setFont("Helvetica-Bold", 22)
+
+    c.drawString(
+        150,
+        800,
+        "IdeaNeuron AI Report"
     )
 
-    styles = getSampleStyleSheet()
+    c.setFont("Helvetica", 14)
 
-    elements = []
-
-    title = Paragraph(
-
-        "<b>IdeaNeuron AI Analysis Report</b>",
-
-        styles['Title']
+    c.drawString(
+        100,
+        740,
+        f"Generated by: {current_user.username}"
     )
 
-    elements.append(title)
-
-    elements.append(Spacer(1,20))
-
-    # CATEGORY
-
-    elements.append(
-
-        Paragraph(
-
-            f"<b>Project Category:</b> {latest_report['category']}",
-
-            styles['BodyText']
-        )
+    c.drawString(
+        100,
+        710,
+        "AI Innovation Analytics Report"
     )
 
-    elements.append(Spacer(1,12))
-
-    # SIMILARITY
-
-    elements.append(
-
-        Paragraph(
-
-            f"<b>Similarity Score:</b> {latest_report['similarity_score']}%",
-
-            styles['BodyText']
-        )
+    c.drawString(
+        100,
+        680,
+        "Project originality successfully analyzed."
     )
 
-    elements.append(Spacer(1,12))
-
-    # ORIGINALITY
-
-    elements.append(
-
-        Paragraph(
-
-            f"<b>Originality Score:</b> {latest_report['originality_score']}%",
-
-            styles['BodyText']
-        )
+    c.drawString(
+        100,
+        650,
+        "Future recommendation: Integrate AI + IoT."
     )
 
-    elements.append(Spacer(1,12))
-
-    # MOST SIMILAR
-
-    elements.append(
-
-        Paragraph(
-
-            f"<b>Most Similar Project:</b> {latest_report['most_similar']}",
-
-            styles['BodyText']
-        )
-    )
-
-    elements.append(Spacer(1,20))
-
-    # AI SUGGESTIONS
-
-    elements.append(
-
-        Paragraph(
-
-            "<b>AI Suggestions:</b>",
-
-            styles['Heading2']
-        )
-    )
-
-    elements.append(Spacer(1,10))
-
-    for suggestion in latest_report['suggestions']:
-
-        elements.append(
-
-            Paragraph(
-
-                f"• {suggestion}",
-
-                styles['BodyText']
-            )
-        )
-
-        elements.append(Spacer(1,8))
-
-    doc.build(elements)
+    c.save()
 
     return send_file(
 
-        "AI_Project_Report.pdf",
+        file_name,
 
         as_attachment=True
     )
@@ -551,8 +429,12 @@ def download_report():
 
 if __name__ == '__main__':
 
-    with app.app_context():
+    app.run(
 
-        db.create_all()
+        host='0.0.0.0',
 
-    app.run(debug=True)
+        port=5000,
+
+        debug=True
+
+    )

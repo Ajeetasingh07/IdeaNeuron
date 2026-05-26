@@ -16,15 +16,20 @@ from werkzeug.security import (
 
 from reportlab.pdfgen import canvas
 
+import os
+
 # =========================
 # APP CONFIG
 # =========================
 
 app = Flask(__name__)
 
-app.secret_key = 'secret123'
+app.secret_key = 'Ajeeta_AI_Project_2026'
 
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///ideas.db'
+basedir = os.path.abspath(os.path.dirname(__file__))
+
+app.config['SQLALCHEMY_DATABASE_URI'] = \
+    'sqlite:///' + os.path.join(basedir, 'ideas.db')
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
@@ -39,6 +44,8 @@ login_manager = LoginManager()
 login_manager.init_app(app)
 
 login_manager.login_view = 'login'
+
+login_manager.session_protection = "strong"
 
 # =========================
 # DATABASE MODELS
@@ -129,8 +136,6 @@ def signup():
 
         password = request.form['password']
 
-        hashed_password = generate_password_hash(password)
-
         existing_user = User.query.filter_by(
             username=username
         ).first()
@@ -138,6 +143,8 @@ def signup():
         if existing_user:
 
             return "Username already exists"
+
+        hashed_password = generate_password_hash(password)
 
         new_user = User(
 
@@ -176,7 +183,7 @@ def login():
             password
         ):
 
-            login_user(user)
+            login_user(user, remember=True)
 
             return redirect(url_for('projects'))
 
@@ -211,10 +218,10 @@ def analyze():
     text = description.lower()
 
     # =========================
-    # SMART AI CATEGORY DETECTION
+    # SMART CATEGORY DETECTION
     # =========================
 
-    # AI CATEGORY
+    # AI
 
     if (
 
@@ -232,7 +239,7 @@ def analyze():
 
         originality = 85
 
-    # BLOCKCHAIN CATEGORY
+    # BLOCKCHAIN
 
     elif (
 
@@ -249,16 +256,16 @@ def analyze():
 
         originality = 80
 
-    # IOT CATEGORY
+    # IOT
 
     elif (
 
         'iot' in text or
         'sensor' in text or
-        'smart irrigation' in text or
         'automation' in text or
         'arduino' in text or
         'raspberry pi' in text or
+        'smart irrigation' in text or
         'smart home' in text
 
     ):
@@ -269,7 +276,7 @@ def analyze():
 
         originality = 75
 
-    # CYBER SECURITY CATEGORY
+    # CYBER SECURITY
 
     elif (
 
@@ -286,7 +293,7 @@ def analyze():
 
         originality = 70
 
-    # DEFAULT CATEGORY
+    # WEB DEVELOPMENT
 
     else:
 
@@ -330,6 +337,7 @@ def analyze():
         "Use cloud integration",
 
         "Add real-time analytics"
+
     ]
 
     return render_template(
@@ -371,6 +379,10 @@ def projects():
         category='IoT'
     ).count()
 
+    cyber_count = Project.query.filter_by(
+        category='Cyber Security'
+    ).count()
+
     web_count = Project.query.filter_by(
         category='Web Development'
     ).count()
@@ -401,6 +413,8 @@ def projects():
         blockchain_count=blockchain_count,
 
         iot_count=iot_count,
+
+        cyber_count=cyber_count,
 
         web_count=web_count,
 

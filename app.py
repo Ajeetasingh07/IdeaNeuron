@@ -25,6 +25,9 @@ import os
 app = Flask(__name__)
 
 app.secret_key = 'Ajeeta_AI_Project_2026'
+app.config['SESSION_COOKIE_SECURE'] = True
+app.config['REMEMBER_COOKIE_SECURE'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = "Lax"
 
 database_url = os.environ.get('DATABASE_URL')
 
@@ -501,12 +504,4 @@ def download_pdf():
 # RUN APP
 # =========================
 
-if __name__ == '__main__':
-
-    app.run(
-
-        host='0.0.0.0',
-
-        port=5000
-
-    )
+app.run(debug=True)
